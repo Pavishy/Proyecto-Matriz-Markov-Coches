@@ -1,6 +1,7 @@
 import numpy as n
 
 T = [0.6,0.2,0.2],[0.3,0.4,0.3],[0.1,0.4,0.5]
+
 P_inicial = [0.7,0.2,0.1]
 
 matrizT = n.array(T)
@@ -28,3 +29,5 @@ for i in range(estadoDeseado):
 
 print("Resultado: (P"+str(estadoDeseado)+"): ")
 print(estadoActual)
+
+#CODIGO DE COCHES
