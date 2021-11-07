@@ -3,84 +3,78 @@ import numpy as n
 import sys
 from PyQt5 import uic, QtWidgets, QtCore
 
-qtCreatorFile = "ControlArduino_HalfDuplex-Markov.ui"  # Nombre del archivo de pyqt
+qtCreatorFile = "ControlArduino_HalfDuplex-Markov.ui"
 
-Ui_MainWindow, QtBaseClass = uic.loadUiType(qtCreatorFile) # la carga del archivo en ventana
+Ui_MainWindow, QtBaseClass = uic.loadUiType(qtCreatorFile)
 
-class MyApp(QtWidgets.QMainWindow, Ui_MainWindow): #es la clase de los widgets
+class MyApp(QtWidgets.QMainWindow, Ui_MainWindow):
     def __init__(self):
         QtWidgets.QMainWindow.__init__(self)
         Ui_MainWindow.__init__(self)
         self.setupUi(self)
 
-        self.arduino = None #cargamos la libreria de arduino para la conexion
+        self.arduino = None
+        self.btn_conexion.clicked.connect(self.conexion)
 
-        self.btn_conexion.clicked.connect(self.conexion) #es el boton con la funcion de conexion
-
-        self.SegundoPlano = QtCore.QTimer() # esto es un timer de el widget que mostrara los datos
-        self.SegundoPlano.timeout.connect(self.accion) #
+        self.SegundoPlano = QtCore.QTimer()
+        self.SegundoPlano.timeout.connect(self.accion)
 
         self.btn_control.clicked.connect(self.control)
 
-        self.valorSensor1 = -1 #sensores inicializados en -1
+        self.valorSensor1 = -1
         self.valorSensor2 = -1
         self.valorSensor3 = -1
 
-        self.btn_control.setText("ENVIAR ACCIÓN") #boton de control con su texto de envio de accion
+        self.btn_control.setText("ENVIAR ACCIÓN")
 
     def control(self):
-        self.valorSensor1 /= 1000 #682 / 1000 = 0.682
+        self.valorSensor1 /= 1000
         self.valorSensor2 /= 1000
         self.valorSensor3 /= 1000
 
-        T = [0.6, 0.2, 0.2], [0.3, 0.4, 0.3], [0.1, 0.4, 0.5] # nuestra matris de carros
+        T = [0.6, 0.2, 0.2], [0.3, 0.4, 0.3], [0.1, 0.4, 0.5]
 
-        P_inicial = [float(self.valorSensor1), float(self.valorSensor2), float(self.valorSensor3)] # el p0
+        P_inicial = [float(self.valorSensor1), float(self.valorSensor2), float(self.valorSensor3)]
 
-        matrizT = n.array(T) # se convierte en matriz
-        matriz_P0 = n.array(P_inicial) # tambien pero de p0
+        matrizT = n.array(T)
+        matriz_P0 = n.array(P_inicial)
 
-        estadoDeseado = int(self.txt_P0.text()) #se muestra el estado deseado (lo que ingresamos de teclado en qt)
+        estadoDeseado = int(self.txt_P0.text())
 
-        estadoActual = matriz_P0 # la matriz se guarda, en estado actual
-        for i in range(estadoDeseado): # se hace la operacion del for por el estado deseado = "2"
-            estadoActual = estadoActual.dot(matrizT) # se multiplica el estado actual por la matriz con "dot"
+        estadoActual = matriz_P0
+        for i in range(estadoDeseado):
+            estadoActual = estadoActual.dot(matrizT)
 
-        self.txt_resP0.setText(str(estadoActual)) # se manda el estado actual como una cadena de texto al label del p0
+        self.txt_resP0.setText(str(estadoActual))
 
-        #estadoActual [0] 0.87  [1] 0.0 [2] 0.1 ---> un ejemplo de como se muestra el estado actual en el label
+        estadoActual=str(estadoActual).replace('[','').replace(']','')
+        estadoActual=str(estadoActual).replace(' ',',').replace(' ',',')
+        self.arduino.write(str(estadoActual).encode())
 
-        estadoActual=str(estadoActual).replace('[','').replace(']','') # se eliminan los CORCHETES CUADRATICOS y se remplazan por nada
-        estadoActual=str(estadoActual).replace(' ',',').replace(' ',',') # cada espacio es reemplazado por una coma
-        self.arduino.write(str(estadoActual).encode()) # se envia a arduino el string, con comas: "0.24,0.87,0.11"
+    def accion(self):
 
-    def accion(self): #funcion de envio de datos de arduino/proteus al listwidget
+        while self.arduino.inWaiting():
+            valor = self.arduino.readline().decode()
 
-        while self.arduino.inWaiting(): # este es el modo de recibir datos desde la "terminal de arduino"
-            valor = self.arduino.readline().decode() # lectura
+            valor = valor.replace("\n", "")
+            valor = valor.replace("\r", "")
 
-            valor = valor.replace("\n", "") # salto de linea
-            valor = valor.replace("\r", "") # tambien
-            #print(valor)  # ejemplo: "I676R809R512F"
+            auxiliar = ""
 
-            auxiliar = "" # valor auxiliar string
-
-            if valor[0] == 'I': #arreglo valor en 0
-                if valor[len(valor) - 1] == 'F': # len es la cantidad de los datos en el ejemplo anterior
+            if valor[0] == 'I':
+                if valor[len(valor) - 1] == 'F':
 
                     # slicing
-                    index = valor.find("R") # la busqueda de los datos antes del char R
+                    index = valor.find("R")
                     valor1 = valor[1:index]
-                    #print("valor1: ", valor1)
+
                     auxiliar += " Sensor1: " + valor1
                     self.valorSensor1 = float(valor1)
 
                     valorNuevo = valor[index + 1:]
-                    # genera una cadena apartir del contenido que falta procesar
-                    # de la cadena original
 
-                    index = valorNuevo.find("R")  # busca la R en la nueva cadena
-                    valor2 = valorNuevo[0:index]  # = valorNuevo[:index]
+                    index = valorNuevo.find("R")
+                    valor2 = valorNuevo[0:index]
 
                     auxiliar += " Sensor2: " + valor2
                     self.valorSensor2 = float(valor2)
@@ -96,13 +90,12 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow): #es la clase de los widgets
 
     def conexion(self):
         v = self.btn_conexion.text()
-        if v == "CONECTAR":  # pasa de desconectado a conectado
+        if v == "CONECTAR":
             self.btn_conexion.setText("DESCONECTAR")
 
-            if self.arduino == None:  # SI NO SE HABIA CONECTADO ANTES
+            if self.arduino == None:
                 com = "COM" + self.txt_com.text()
-                self.arduino = s.Serial(com, baudrate=9600, timeout=1000)  ##realiza la conexion con virtual serial
-                # y la iniciliza
+                self.arduino = s.Serial(com, baudrate=9600, timeout=1000)
 
                 self.txt_estado.setText("INICIALIZADO")
 
@@ -114,7 +107,7 @@ class MyApp(QtWidgets.QMainWindow, Ui_MainWindow): #es la clase de los widgets
 
                 self.SegundoPlano.start(100)
 
-        else:  # pasa de conectado a desconectado
+        else:
             self.btn_conexion.setText("CONECTAR")
 
             self.arduino.close()
